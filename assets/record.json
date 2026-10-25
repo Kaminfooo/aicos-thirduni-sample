@@ -1,0 +1,33 @@
+{
+  "id": "licensed-lateral-fall-reference",
+  "title": "Recorded person-down alert from a controlled laboratory simulation",
+  "alert_seconds": 8.766666666666667,
+  "model_score": 0.85,
+  "medical_cause": "unknown",
+  "transition": "not established",
+  "live_inference": false,
+  "model": "Ultralytics YOLO26n pose; recorded private evaluation, no weights included",
+  "model_sha256": "eb3bb8268828aeaf515cec23a4bfafd793944a86fe9af94ba7823609c14522a9",
+  "media_sha256": {
+    "context.gif": "02f9b0130818ae312fff8a2e456976dfb39c2a09753731749a4f395f3fe2f960",
+    "controlled-fall.mp4": "bfeda260c3ced0feea4e28e4c5e3cc47119523ed5419ac72ce98bc201ff1860b",
+    "LICENSE.txt": "f5b745ef98087f531e719ee8ca6a96809444573ecc7173c6fa68eaad39b3cc3f",
+    "trigger.jpg": "2481db352bd869fde32f7cc737067c112bdf0f97dda4fada46b57d649e1f3c8e",
+    "walking.mp4": "658646b6de7eca0921fc59fd381facccaa2707e76e2f35ad5bba4c2edb85860b"
+  },
+  "credit": "ASSIST-IoT dataset: Anastasiya Danilenka, Piotr Sowiński, Monika Kobus, Anna Dąbrowska, Kajetan Rachwał, Karolina Bogacka, Krzysztof Baszczyński; CC BY 4.0; EU grant 957258; CIOP-PIB facilities. No endorsement implied.",
+  "source": "https://github.com/ASSIST-IoT-SRIPAS/multimodal-fall-detection-dataset",
+  "media_license": "https://creativecommons.org/licenses/by/4.0/",
+  "changes": "MP4 originals unchanged. JPEG extracted; GIF resized and captioned.",
+  "selection": "Selected after development evaluation; not independent outdoor validation.",
+  "reference_results": {
+    "fall_clips_alerted": 4,
+    "fall_clips": 4,
+    "ordinary_clips_alerted": 0,
+    "ordinary_clips": 9,
+    "ordinary_seconds": 62.7,
+    "extra_same_source_alerts": 1,
+    "same_dataset": true,
+    "accuracy_99_established": false
+  }
+}
