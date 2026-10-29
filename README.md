@@ -4,7 +4,7 @@ AICOS helps camera operators inspect potential safety incidents, review the asso
 
 ## Try the product
 
-Open the deployed operations URL supplied in the submission, then choose **Start guided walkthrough → Analyse supplied recording**. This runs fresh inference on licensed source footage; it is different from the older standalone recorded-output sample. No account, camera installation or private camera URL is needed for this path.
+Open [AICOS Safety Operations](https://aicos-safety-operations.onrender.com/), then choose **Start guided walkthrough → Analyse supplied recording**. This runs fresh inference on licensed source footage; it is different from the older standalone recorded-output sample. No account, camera installation or private camera URL is needed for this path.
 
 Read [the usage guide](docs/REVIEWER-GUIDE.md) for the exact workflow. The demo is isolated from production accounts and dispatch systems. Data and signing identity reset when the demo service restarts. Render Free can take about a minute to wake; recheck the connection after it loads.
 

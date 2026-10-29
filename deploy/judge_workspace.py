@@ -76,6 +76,8 @@ class Worker:
                    MPLCONFIGDIR=str(isolated.BOOT / 'matplotlib'), OMP_NUM_THREADS='2', MKL_NUM_THREADS='2')
         if isolated.hostname:
             env.update(OMP_NUM_THREADS='1', MKL_NUM_THREADS='1')
+        for name in ('yolo', 'matplotlib'):
+            (isolated.BOOT / name).mkdir(parents=True, exist_ok=True)
         self.process = subprocess.Popen([str(python), '-I', '-B', str(ROOT / 'deploy/judge_inference_worker.py')],
             cwd=ROOT, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=None if isolated.hostname else self.log, text=True, encoding='utf-8', bufsize=1,

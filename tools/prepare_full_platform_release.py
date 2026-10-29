@@ -71,6 +71,7 @@ def main():
     files['config/cameras-phone.yaml']=yaml.safe_dump(fixture,sort_keys=False).encode()
     files['.gitignore']=b'.env\n.env.*\n!.env.example\n.runtime/\n.venv/\n.venv-inference/\n__pycache__/\n*.pyc\n*.db\n*.db-*\n*.pem\n*.key\n*.dpapi\n*.pt\n*.onnx\n*.engine\ndata/\nresults/\nruns/\nsnapshots/\n*.download\n'
     files['.dockerignore']=b'.git\n.runtime\n.venv\n.venv-inference\n__pycache__\n*.pyc\ndata\nresults\nruns\n*.db\n*.pem\n*.key\n*.dpapi\n'
+    files['.gitattributes']=b'* -text\n'
     files['render.yaml']=files['deploy/render-workspace.yaml']
     files['docs/VALIDATION-STATUS.md']=('''# Validation status — 29 October 2026
 

@@ -24,6 +24,13 @@ def main():
     torch.set_num_threads(1 if hosted else 2)
     if hosted:
         torch.set_num_interop_threads(1)
+        # Ultralytics select_device() otherwise resets Torch to as many as eight
+        # threads from host CPU count, ignoring this container's fractional CPU.
+        import ultralytics.utils
+        import ultralytics.utils.torch_utils
+        ultralytics.utils.NUM_THREADS = 1
+        ultralytics.utils.torch_utils.NUM_THREADS = 1
+        cv2.setNumThreads(1)
     model = ROOT / 'models/pretrained/yolo26n-pose.pt'
     expected = 'eb3bb8268828aeaf515cec23a4bfafd793944a86fe9af94ba7823609c14522a9'
     if not model.is_file() or hashlib.sha256(model.read_bytes()).hexdigest() != expected:
@@ -36,7 +43,7 @@ def main():
         started = time.monotonic()
         engines.get('yolo26n-pose.pt').infer(np.zeros((480,640,3),dtype=np.uint8))
         engines.begin()
-        print(f'Hosted pose warm-up completed in {time.monotonic()-started:.1f}s',file=sys.stderr,flush=True)
+        print(f'Hosted pose warm-up completed in {time.monotonic()-started:.1f}s; Torch threads={torch.get_num_threads()}',file=sys.stderr,flush=True)
     states = {}
 
     def reply(value):
