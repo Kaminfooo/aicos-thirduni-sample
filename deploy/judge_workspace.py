@@ -74,9 +74,11 @@ class Worker:
         env = dict(os.environ, TEMP=str(isolated.BOOT), TMP=str(isolated.BOOT),
                    YOLO_AUTOINSTALL='false', YOLO_CONFIG_DIR=str(isolated.BOOT / 'yolo'),
                    MPLCONFIGDIR=str(isolated.BOOT / 'matplotlib'), OMP_NUM_THREADS='2', MKL_NUM_THREADS='2')
+        if isolated.hostname:
+            env.update(OMP_NUM_THREADS='1', MKL_NUM_THREADS='1')
         self.process = subprocess.Popen([str(python), '-I', '-B', str(ROOT / 'deploy/judge_inference_worker.py')],
             cwd=ROOT, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=self.log, text=True, encoding='utf-8', bufsize=1,
+            stderr=None if isolated.hostname else self.log, text=True, encoding='utf-8', bufsize=1,
             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         def read():
             for line in self.process.stdout:
@@ -84,7 +86,7 @@ class Worker:
             self.lines.put(None)
         threading.Thread(target=read, daemon=True).start()
         try:
-            ready = self._read(45)
+            ready = self._read(180 if isolated.hostname else 45)
             if not ready.get('ready'):
                 raise RuntimeError('Inference worker did not become ready')
         except Exception:

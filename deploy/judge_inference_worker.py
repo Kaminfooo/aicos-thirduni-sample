@@ -2,8 +2,10 @@
 import base64
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'edge'))
@@ -18,13 +20,23 @@ def main():
     import numpy as np
     import torch
     from deploy.judge_detector_pipeline import Engines, Pipeline, HASHES
-    torch.set_num_threads(2)
+    hosted = bool(os.environ.get('RENDER_EXTERNAL_HOSTNAME'))
+    torch.set_num_threads(1 if hosted else 2)
+    if hosted:
+        torch.set_num_interop_threads(1)
     model = ROOT / 'models/pretrained/yolo26n-pose.pt'
     expected = 'eb3bb8268828aeaf515cec23a4bfafd793944a86fe9af94ba7823609c14522a9'
     if not model.is_file() or hashlib.sha256(model.read_bytes()).hexdigest() != expected:
         raise RuntimeError('Existing reference model is missing or changed; no download attempted')
     engines = Engines()
     engines.get('yolo26n-pose.pt')
+    if hosted:
+        # Complete lazy predictor imports/warm-up before advertising readiness.
+        # A blank synthetic frame creates no session, incident or stored evidence.
+        started = time.monotonic()
+        engines.get('yolo26n-pose.pt').infer(np.zeros((480,640,3),dtype=np.uint8))
+        engines.begin()
+        print(f'Hosted pose warm-up completed in {time.monotonic()-started:.1f}s',file=sys.stderr,flush=True)
     states = {}
 
     def reply(value):
