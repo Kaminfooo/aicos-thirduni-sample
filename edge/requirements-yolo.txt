@@ -1,0 +1,9 @@
+# Real behavior detection pack — installs PyTorch (large download).
+# Jetson: install NVIDIA's torch wheel for your JetPack BEFORE this.
+ultralytics>=8.2
+
+# Optional: public live-stream sources (YouTube live cameras)
+yt-dlp>=2024.8
+
+# Downloads trained fall/violence models from Hugging Face
+huggingface_hub>=0.23

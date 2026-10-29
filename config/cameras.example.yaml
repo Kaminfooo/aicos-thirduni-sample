@@ -1,0 +1,127 @@
+# AICOS edge worker configuration
+# Copy to cameras.yaml, fill in real RTSP URLs, then run rtsp_worker.py
+
+settings:
+  process_every_n_frames: 12     # analyze 1 of every N frames (CPU/GPU budget)
+  event_cooldown_seconds: 30     # min seconds between identical events per camera
+  resize_width: 640              # downscale frames before analysis
+  snapshot_interval_seconds: 2   # JPEG-snapshot cameras: seconds between polls
+  event_snapshots: true          # attach the triggering frame to each event
+  event_snapshot_quality: 70
+  event_clips: true              # also attach the seconds BEFORE the alert
+  clip_seconds: 6                # how much lead-up to keep in memory
+  clip_fps: 3
+  clip_width: 480
+
+  detectors:
+    motion:
+      enabled: false             # simple motion demo (noisy; off when YOLO is on)
+    yolo:
+      enabled: false             # set true after: pip install -r requirements-yolo.txt
+      model: "yolov8n-pose.pt"   # auto-downloads (~7 MB) on first run
+      conf: 0.35
+      imgsz: 640
+      person_down:                                    # collapsed person -> SEV 4
+        enabled: true
+        seconds: 4
+        gap_tolerance: 3        # bridge detector dropouts; prone bodies flicker
+        max_drift: 0.7          # body lengths of movement still counted as "still"
+        collapse_drop: 0.40     # height loss that counts as going to the ground
+        collapse_window: 6      # they must have been upright this recently
+        still_drift: 0.35       # motionless enough to still be the person who fell
+        upright_ratio: 0.70     # boxes narrower than this are someone standing
+        site_max_seconds: 300   # an incident is never held open longer than this
+      fight:                                          # possible altercation -> SEV 3
+        enabled: true
+        seconds: 4
+        proximity: 1.0          # engagement distance, in body heights
+        min_speed: 0.5          # body-heights/sec; walking is ~0.8
+        max_path_ratio: 0.45    # lower = "moving but going nowhere"
+        min_gap_variation: 0.10 # the pair's gap must open and close
+        min_limb_speed: 1.2     # hands moving this fast counts as striking,
+        max_travel: 0.8         # but only if they are not walking anywhere
+      crowd:       { enabled: true, warn: 8, critical: 15 }
+      panic:       { enabled: true, min_runners: 3, run_speed: 1.8 }
+      intrusion:   { enabled: true }                   # needs zones on the camera
+      loitering:   { enabled: true, seconds: 120 }     # needs a 'loiter' zone
+      abandoned_object:                               # unattended bag -> SEV 3
+        enabled: false
+        seconds: 60
+        owner_radius: 0.12      # person this close (fraction of width) = attended
+        move_tolerance: 0.03
+      fall_model:                                     # trained ON fallen people
+        enabled: false          # see docs/FALL-MODEL-GUIDE.md
+        repo: "melihuzunoglu/human-fall-detection"
+        conf: 0.35
+        imgsz: 640
+        seconds: 3
+        cooldown_seconds: 90
+      violence:                                       # trained ON fights
+        enabled: false          # see docs/VIOLENCE-MODEL-GUIDE.md
+        repo: "Musawer14/fight_detection_yolov8"
+        violence_class: 1       # class id meaning fight/violence
+        conf: 0.5
+        stride: 2               # analyze 1 of every N frames offered
+        persistence: 3          # consecutive positives before alerting
+        cooldown_seconds: 60
+      night:                                          # local clock of this machine
+        hours: ""               # e.g. "21:00-06:00"; empty = disabled
+        severity_boost: 1       # security events only
+      vehicles:                                       # traffic behaviors
+        enabled: false
+        stopped_seconds: 45
+        move_tolerance: 0.02
+        congestion_count: 6
+        wrong_way:
+          enabled: false
+          direction: ""         # left | right | up | down = normal flow
+          min_speed: 0.15
+      snatch:                                         # grab-and-run -> SEV 4
+        enabled: false
+        contact: 0.9            # must come this close (body heights)
+        contact_samples: 2      # and stay close - a fly-past is not contact
+        flee_speed: 1.6         # then one leaves at running speed
+        window: 6
+        separation: 2.5
+
+cameras:
+  - id: "CAM-001"
+    name: "Main Square North"
+    rtsp_url: "rtsp://user:password@192.168.10.101:554/Streaming/Channels/101"
+    district: "Central"
+    lat: 0.0
+    lon: 0.0
+    # rotate: 90            # if the camera is mounted sideways or inverted.
+                            # Every detector reasons about vertical, so an
+                            # uncorrected rotation makes standing people look
+                            # like they have fallen. 0, 90, 180 or 270.
+    # Optional ground calibration: reports incidents where the PERSON is
+    # instead of at the camera. Pick 4+ landmarks ON THE GROUND, spread
+    # across the view (never four in a line). image = fraction of the
+    # frame; world = [lat, lon] read from satellite view.
+    # calibration:
+    #   - image: [0.15, 0.90]
+    #     world: [34.87120, 3.31400]
+    #   - image: [0.85, 0.90]
+    #     world: [34.87120, 3.31444]
+    #   - image: [0.70, 0.35]
+    #     world: [34.87147, 3.31438]
+    #   - image: [0.30, 0.35]
+    #     world: [34.87147, 3.31406]
+
+    # Optional zones (coordinates are fractions of the frame, 0.0-1.0):
+    zones:
+      - name: "Bank entrance"
+        type: intrusion            # fires when a person's feet are inside
+        active_hours: "21:00-06:00"  # SEV 4 inside these hours; omit = always, SEV 3
+        points: [[0.35, 0.45], [0.75, 0.45], [0.75, 0.95], [0.35, 0.95]]
+      - name: "ATM lobby"
+        type: loiter               # fires after 'loitering.seconds' inside
+        points: [[0.10, 0.30], [0.30, 0.30], [0.30, 0.90], [0.10, 0.90]]
+
+  - id: "CAM-002"
+    name: "Bus Station Entrance"
+    rtsp_url: "rtsp://user:password@192.168.10.102:554/cam/realmonitor?channel=1&subtype=0"
+    district: "Old Harbor"
+    lat: 0.0
+    lon: 0.0

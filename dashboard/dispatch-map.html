@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AICOS · Dispatch Map</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  :root { --ink:#060a12; --panel:#0b111e; --line:rgba(125,150,190,.16); --teal:#5eead4;
+          --text:#dbe4f3; --mut:#7c8aa5; --red:#f43f5e; --amber:#fbbf24; }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--ink); color:var(--text); font-family:'IBM Plex Mono',monospace;
+         height:100vh; display:flex; flex-direction:column; }
+  header { display:flex; gap:10px; align-items:center; padding:10px 14px;
+           border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .logo { background:var(--teal); color:#04211c; font-family:'Chakra Petch',sans-serif;
+          font-weight:700; letter-spacing:2px; padding:5px 11px; border-radius:5px; }
+  .sub { font-size:10px; color:var(--mut); letter-spacing:1.5px; }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--red); }
+  .dot.live { background:var(--teal); animation:blink 1.4s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+  label.chk { font-size:10px; color:var(--mut); display:flex; gap:5px; align-items:center; cursor:pointer; }
+  #wrap { flex:1; display:flex; min-height:0; }
+  #map { flex:1; }
+  aside { width:295px; border-left:1px solid var(--line); background:var(--panel);
+          padding:12px; overflow-y:auto; }
+  aside h3 { font-family:'Chakra Petch',sans-serif; font-size:11px; letter-spacing:2px;
+             color:var(--mut); margin-bottom:8px; }
+  .rt { border:1px solid var(--line); border-radius:8px; padding:10px; margin-bottom:10px; }
+  .rt .big { font-size:22px; font-weight:600; color:var(--teal); }
+  .rt .m { font-size:10px; color:var(--mut); margin-top:3px; line-height:1.5; }
+  button { background:var(--teal); color:#04211c; border:0; border-radius:5px;
+           font-family:'Chakra Petch',sans-serif; font-weight:600; font-size:10.5px;
+           padding:6px 12px; cursor:pointer; letter-spacing:.5px; }
+  button.ghost { background:transparent; color:var(--mut); border:1px solid var(--line); }
+  #overlay { position:fixed; inset:0; background:rgba(6,10,18,.94); display:flex;
+             align-items:center; justify-content:center; padding:24px; z-index:50; }
+  #overlay .card { max-width:560px; border:1px solid var(--line); border-radius:10px;
+                   background:var(--panel); padding:22px; font-size:12.5px; line-height:1.7; }
+  #overlay code { color:var(--teal); }
+  .evrow { display:flex; gap:8px; align-items:center; padding:7px 8px; border-radius:6px;
+           border:1px solid var(--line); margin-bottom:6px; cursor:pointer; font-size:10.5px; }
+  .evrow:hover { border-color:var(--teal); }
+  .sev { font-size:9px; font-weight:700; padding:1px 6px; border-radius:4px; border:1px solid; }
+  ::-webkit-scrollbar { width:5px } ::-webkit-scrollbar-thumb { background:rgba(125,150,190,.25); }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="logo">AICOS</span>
+  <div>
+    <div style="font-family:'Chakra Petch',sans-serif;font-size:12px;letter-spacing:2px;">DISPATCH MAP</div>
+    <div class="sub">LIVE TRAFFIC · FASTEST ROUTE TO INCIDENT</div>
+  </div>
+  <span style="flex:1"></span>
+  <label class="chk"><input type="checkbox" id="chkTraffic" checked> TRAFFIC</label>
+  <label class="chk"><input type="checkbox" id="chkAuto" checked> AUTO-ROUTE SEV 5</label>
+  <span id="statusDot" class="dot"></span>
+  <span id="statusTxt" class="sub">OFFLINE</span>
+</header>
+
+<div id="wrap">
+  <div id="map"></div>
+  <aside>
+    <h3>ACTIVE ROUTE</h3>
+    <div id="routeBox" class="rt" style="display:none">
+      <div class="big" id="rEta">—</div>
+      <div class="m" id="rMeta">—</div>
+      <div style="margin-top:8px; display:flex; gap:6px;">
+        <button class="ghost" onclick="clearRoute()">CLEAR</button>
+      </div>
+    </div>
+    <div class="m" id="routeHint" style="font-size:10.5px;color:var(--mut);line-height:1.6;margin-bottom:14px;">
+      Tap any incident on the map, then “ROUTE NEAREST UNIT”. Route uses live Google traffic;
+      severity-5 incidents route automatically.
+    </div>
+    <h3>INCIDENTS</h3>
+    <div id="evList"></div>
+  </aside>
+</div>
+
+<div id="overlay" style="display:none">
+  <div class="card">
+    <b style="color:var(--teal)">Google Maps API key required.</b><br><br>
+    1. In Google Cloud Console create a project and enable
+       <code>Maps JavaScript API</code> + <code>Directions API</code>.<br>
+    2. Create an API key (restrict it to your dashboard domain/IP).<br>
+    3. Open this file and paste the key into <code>CONFIG.GOOGLE_MAPS_API_KEY</code>.<br>
+    4. Edit <code>CONFIG.STATIONS</code> with your real station coordinates.<br><br>
+    The map loads with a live traffic layer, incident markers from the AICOS backend,
+    and traffic-aware fastest routes for ambulance, fire and police units.
+  </div>
+</div>
+
+<script src="/dashboard/aicos-auth.js"></script>
+<script>
+/* ================= CONFIG — edit before deployment ================= */
+var CONFIG = {
+  GOOGLE_MAPS_API_KEY: "",              // <-- paste your key here
+  BACKEND_URL: "",                       // empty = same host that serves this page
+  CITY_CENTER: { lat: 34.6714, lng: 3.2631 },  // set to your city
+  ZOOM: 13,
+  STATIONS: [
+    { name: "Central Police HQ",  type: "police",    lat: 34.6760, lng: 3.2560 },
+    { name: "Fire Station 1",     type: "fire",      lat: 34.6650, lng: 3.2710 },
+    { name: "Hospital / Ambulance", type: "ambulance", lat: 34.6800, lng: 3.2780 }
+  ]
+};
+/* =================================================================== */
+
+var AGENT_COLORS = { security:"#fb7185", emergency:"#f97316", traffic:"#fbbf24",
+                     infrastructure:"#38bdf8", environmental:"#34d399" };
+var STATION_COLORS = { police:"#7da7f5", fire:"#f97316", ambulance:"#34d399" };
+/* which unit types can serve which agent's incidents */
+var AGENT_UNITS = { security:["police"], emergency:["ambulance","fire"],
+                    traffic:["police"], infrastructure:["fire"], environmental:["fire"] };
+
+var map, trafficLayer, dirService, dirRenderer, infoWin, ws;
+var markers = {}, events = {}, routedId = null;
+
+var $ = function (id) { return document.getElementById(id); };
+function setStatus(live, txt){ $("statusDot").className = live?"dot live":"dot"; $("statusTxt").textContent = txt; }
+
+/* ---------- Google Maps bootstrap ---------- */
+(function boot(){
+  if (!CONFIG.GOOGLE_MAPS_API_KEY) { $("overlay").style.display = "flex"; return; }
+  var s = document.createElement("script");
+  s.src = "https://maps.googleapis.com/maps/api/js?key=" +
+          encodeURIComponent(CONFIG.GOOGLE_MAPS_API_KEY) + "&callback=initMap";
+  s.async = true;
+  s.onerror = function(){ $("overlay").style.display = "flex"; };
+  document.head.appendChild(s);
+})();
+
+var DARK_STYLE = [
+  { elementType:"geometry", stylers:[{color:"#0b111e"}] },
+  { elementType:"labels.text.fill", stylers:[{color:"#8b9ab5"}] },
+  { elementType:"labels.text.stroke", stylers:[{color:"#060a12"}] },
+  { featureType:"road", elementType:"geometry", stylers:[{color:"#1a2740"}] },
+  { featureType:"road.highway", elementType:"geometry", stylers:[{color:"#24365c"}] },
+  { featureType:"water", elementType:"geometry", stylers:[{color:"#08101f"}] },
+  { featureType:"poi", stylers:[{visibility:"off"}] },
+  { featureType:"transit", stylers:[{visibility:"off"}] }
+];
+
+function initMap(){
+  map = new google.maps.Map($("map"), {
+    center: CONFIG.CITY_CENTER, zoom: CONFIG.ZOOM, styles: DARK_STYLE,
+    disableDefaultUI: true, zoomControl: true
+  });
+  trafficLayer = new google.maps.TrafficLayer();
+  trafficLayer.setMap(map);
+  dirService  = new google.maps.DirectionsService();
+  dirRenderer = new google.maps.DirectionsRenderer({
+    map: map, suppressMarkers: true,
+    polylineOptions: { strokeColor: "#5eead4", strokeWeight: 5, strokeOpacity: 0.95 }
+  });
+  infoWin = new google.maps.InfoWindow();
+
+  $("chkTraffic").onchange = function(){ trafficLayer.setMap(this.checked ? map : null); };
+
+  CONFIG.STATIONS.forEach(function(st){
+    new google.maps.Marker({
+      map: map, position: { lat: st.lat, lng: st.lng }, title: st.name,
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7,
+              fillColor: STATION_COLORS[st.type] || "#7da7f5", fillOpacity: 1,
+              strokeColor: "#060a12", strokeWeight: 2 },
+      label: { text: st.type === "police" ? "P" : st.type === "fire" ? "F" : "A",
+               color: "#060a12", fontSize: "9px", fontWeight: "700" }
+    });
+  });
+
+  connectBackend();
+}
+
+/* ---------- Backend live feed ---------- */
+function backendBase(){
+  return (CONFIG.BACKEND_URL || window.location.origin).replace(/\/+$/, "");
+}
+function authToken(){
+  var t=(window.AicosAuth&&AicosAuth.token())||"";
+  if(!t){window.location.href="/dashboard/login.html";}
+  return t;
+}
+function connectBackend(){
+  var base = backendBase();
+  if (base.indexOf("http") !== 0) { setStatus(false, "NO BACKEND"); return; }
+  var token = authToken();
+  var wsUrl = base.replace(/^http/, "ws") + "/ws/events";
+  try { ws = new WebSocket(wsUrl); } catch(e){ setStatus(false, "BAD URL"); return; }
+  ws.onopen = function(){ ws.send(JSON.stringify({kind:"auth", token:token})); setStatus(true, "LIVE"); };
+  ws.onclose = function(){ setStatus(false, "RETRYING"); setTimeout(connectBackend, 3000); };
+  ws.onerror = function(){ try{ ws.close(); }catch(e){} };
+  ws.onmessage = function(m){
+    var msg; try { msg = JSON.parse(m.data); } catch(e){ return; }
+    if (msg.kind === "snapshot" && Array.isArray(msg.events)) msg.events.forEach(function(ev){ upsertEvent(ev, false); });
+    else if (msg.kind === "event" && msg.event) upsertEvent(msg.event, true);
+  };
+}
+
+function upsertEvent(ev, isNew){
+  if (!ev || typeof ev.lat !== "number" || typeof ev.lon !== "number") return;
+  if (!ev.lat && !ev.lon) return;               // skip events without coordinates
+  events[ev.id] = ev;
+  if (!markers[ev.id]) {
+    var col = ev.severity >= 4 ? "#f43f5e" : (AGENT_COLORS[ev.agent] || "#8b9ab5");
+    var mk = new google.maps.Marker({
+      map: map, position: { lat: ev.lat, lng: ev.lon },
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: ev.severity >= 4 ? 9 : 6,
+              fillColor: col, fillOpacity: 0.95, strokeColor: "#060a12", strokeWeight: 2 },
+      animation: isNew && ev.severity >= 4 ? google.maps.Animation.BOUNCE : null,
+      title: ev.type
+    });
+    if (mk.getAnimation()) setTimeout(function(){ mk.setAnimation(null); }, 2800);
+    mk.addListener("click", function(){ openInfo(ev.id); });
+    markers[ev.id] = mk;
+  }
+  renderList();
+  if (isNew && ev.severity >= 5 && $("chkAuto").checked) routeToEvent(ev.id);
+  else if (isNew && ev.severity >= 4) map.panTo({ lat: ev.lat, lng: ev.lon });
+}
+
+function openInfo(id){
+  var ev = events[id]; if (!ev) return;
+  var div = document.createElement("div");
+  div.style.cssText = "font-family:monospace;color:#0f172a;font-size:12px;min-width:190px";
+  var b = document.createElement("b"); b.textContent = ev.type; div.appendChild(b);
+  var meta = document.createElement("div");
+  meta.style.cssText = "margin:4px 0 8px;color:#475569;font-size:11px";
+  meta.textContent = "SEV " + ev.severity + " · conf " + Math.round((ev.confidence||0)*100) +
+                     "% · " + (ev.source_id||"") + (ev.district ? " · " + ev.district : "");
+  div.appendChild(meta);
+  var btn = document.createElement("button");
+  btn.textContent = "ROUTE NEAREST UNIT";
+  btn.style.cssText = "background:#0e7490;color:#fff;border:0;border-radius:5px;padding:6px 10px;cursor:pointer;font-weight:600";
+  btn.onclick = function(){ infoWin.close(); routeToEvent(id); };
+  div.appendChild(btn);
+  infoWin.setContent(div);
+  infoWin.open(map, markers[id]);
+}
+
+/* ---------- Traffic-aware routing ---------- */
+function routeOnce(origin, dest){
+  return new Promise(function(resolve){
+    dirService.route({
+      origin: origin, destination: dest, travelMode: google.maps.TravelMode.DRIVING,
+      drivingOptions: { departureTime: new Date(), trafficModel: "bestguess" }
+    }, function(res, status){
+      if (status === "OK" && res.routes.length) {
+        var leg = res.routes[0].legs[0];
+        resolve({ res: res, secs: (leg.duration_in_traffic || leg.duration).value, leg: leg });
+      } else resolve(null);
+    });
+  });
+}
+
+function routeToEvent(id){
+  var ev = events[id]; if (!ev || !map) return;
+  var unitTypes = AGENT_UNITS[ev.agent] || ["police"];
+  var candidates = CONFIG.STATIONS.filter(function(s){ return unitTypes.indexOf(s.type) !== -1; });
+  if (!candidates.length) candidates = CONFIG.STATIONS.slice();
+  var dest = { lat: ev.lat, lng: ev.lon };
+  $("rEta").textContent = "…";
+  $("rMeta").textContent = "computing fastest route in live traffic";
+  $("routeBox").style.display = "block";
+
+  Promise.all(candidates.map(function(st){
+    return routeOnce({ lat: st.lat, lng: st.lng }, dest).then(function(r){
+      return r ? { st: st, r: r } : null;
+    });
+  })).then(function(list){
+    list = list.filter(Boolean);
+    if (!list.length) { $("rEta").textContent = "N/A"; $("rMeta").textContent = "routing failed — check Directions API is enabled"; return; }
+    list.sort(function(a, b){ return a.r.secs - b.r.secs; });
+    var best = list[0];
+    routedId = id;
+    dirRenderer.setDirections(best.r.res);
+    var mins = Math.round(best.r.secs / 60);
+    $("rEta").textContent = mins + " min";
+    $("rMeta").textContent = best.st.name + " (" + best.st.type + ") → " + ev.type +
+      " · " + best.r.leg.distance.text + " · live traffic included";
+  });
+}
+
+function clearRoute(){
+  routedId = null;
+  dirRenderer.set("directions", null);
+  $("routeBox").style.display = "none";
+}
+
+/* ---------- Sidebar list ---------- */
+function renderList(){
+  var box = $("evList"); box.textContent = "";
+  var ids = Object.keys(events).sort(function(a,b){ return b - a; }).slice(0, 25);
+  ids.forEach(function(id){
+    var ev = events[id];
+    var row = document.createElement("div"); row.className = "evrow";
+    var sev = document.createElement("span"); sev.className = "sev";
+    var col = ev.severity >= 4 ? "#f43f5e" : "#8b9ab5";
+    sev.style.color = col; sev.style.borderColor = col; sev.textContent = "S" + ev.severity;
+    var t = document.createElement("span");
+    t.style.cssText = "flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+    t.textContent = ev.type;
+    row.appendChild(sev); row.appendChild(t);
+    row.onclick = function(){
+      map.panTo({ lat: ev.lat, lng: ev.lon }); map.setZoom(15); openInfo(ev.id);
+    };
+    box.appendChild(row);
+  });
+}
+</script>
+</body>
+</html>

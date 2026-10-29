@@ -1,0 +1,2 @@
+# Optional ONVIF integration tooling. This does not by itself make AICOS ONVIF-conformant.
+onvif-zeep>=0.2.12

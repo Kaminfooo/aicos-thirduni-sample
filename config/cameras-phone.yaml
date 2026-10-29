@@ -1,0 +1,54 @@
+settings:
+  process_every_n_frames: 8
+  event_cooldown_seconds: 30
+  resize_width: 480
+  event_snapshots: true
+  event_clips: true
+  clip_seconds: 6
+  clip_fps: 3
+  clip_width: 480
+  detectors:
+    motion:
+      enabled: false
+    yolo:
+      enabled: true
+      model: yolov8s-pose.pt
+      conf: 0.3
+      imgsz: 320
+      person_down:
+        enabled: true
+        seconds: 3
+        gap_tolerance: 4
+        max_drift: 0.7
+        collapse_drop: 0.4
+        collapse_window: 6
+        still_drift: 0.35
+        upright_ratio: 0.7
+        site_max_seconds: 300
+      fall_model:
+        enabled: false
+        repo: melihuzunoglu/human-fall-detection
+        conf: 0.35
+        imgsz: 640
+        seconds: 3
+        cooldown_seconds: 90
+      fight:
+        enabled: true
+        seconds: 5
+      crowd:
+        enabled: true
+        warn: 8
+        critical: 15
+      panic:
+        enabled: false
+      intrusion:
+        enabled: false
+      loitering:
+        enabled: false
+cameras:
+- id: CAM-LIVE
+  name: Example camera
+  district: Example site
+  lat: 0.0
+  lon: 0.0
+  rtsp_url: rtsp://REPLACE_USER:REPLACE_PASSWORD@camera.example.invalid/stream

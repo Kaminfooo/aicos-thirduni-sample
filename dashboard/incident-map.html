@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AICOS · Incident Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  :root { --ink:#060a12; --panel:#0b111e; --line:rgba(125,150,190,.16); --teal:#5eead4;
+          --text:#dbe4f3; --mut:#7c8aa5; --red:#f43f5e; }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--ink); color:var(--text); font-family:'IBM Plex Mono',monospace;
+         height:100vh; display:flex; flex-direction:column; }
+  header { display:flex; gap:10px; align-items:center; padding:10px 14px;
+           border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .logo { background:var(--teal); color:#04211c; font-family:'Chakra Petch',sans-serif;
+          font-weight:700; letter-spacing:2px; padding:5px 11px; border-radius:5px; }
+  .sub { font-size:10px; color:var(--mut); letter-spacing:1.5px; }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--red); }
+  .dot.live { background:var(--teal); animation:blink 1.4s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+  #wrap { flex:1; display:flex; min-height:0; }
+  #map { flex:1; background:#0b111e; }
+  aside { width:290px; border-left:1px solid var(--line); background:var(--panel);
+          padding:12px; overflow-y:auto; }
+  aside h3 { font-family:'Chakra Petch',sans-serif; font-size:11px; letter-spacing:2px;
+             color:var(--mut); margin-bottom:8px; }
+  .row { display:flex; gap:8px; align-items:center; padding:7px 8px; border-radius:6px;
+         border:1px solid var(--line); margin-bottom:6px; cursor:pointer; font-size:10.5px; }
+  .row:hover { border-color:var(--teal); }
+  .row img { width:44px; height:30px; object-fit:cover; border-radius:3px; }
+  .sev { font-size:9px; font-weight:700; padding:1px 6px; border-radius:4px; border:1px solid; }
+  .hint { font-size:10.5px; color:var(--mut); line-height:1.6; margin-bottom:12px; }
+  .leaflet-popup-content-wrapper { background:#0b111e; color:#dbe4f3; border-radius:8px;
+                                   border:1px solid rgba(125,150,190,.3); }
+  .leaflet-popup-tip { background:#0b111e; }
+  .leaflet-popup-content { margin:10px 12px; font-family:'IBM Plex Mono',monospace; font-size:11px; }
+  .leaflet-popup-content img { width:100%; border-radius:4px; margin-top:6px; }
+  .leaflet-container { background:#0b111e; }
+  ::-webkit-scrollbar { width:5px } ::-webkit-scrollbar-thumb { background:rgba(125,150,190,.25); }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="logo">AICOS</span>
+  <div>
+    <div style="font-family:'Chakra Petch',sans-serif;font-size:12px;letter-spacing:2px;">INCIDENT MAP</div>
+    <div class="sub">OPENSTREETMAP · NO API KEY REQUIRED</div>
+  </div>
+  <span style="flex:1"></span>
+  <span id="statusDot" class="dot"></span>
+  <span id="statusTxt" class="sub">OFFLINE</span>
+</header>
+
+<div id="wrap">
+  <div id="map"></div>
+  <aside>
+    <div class="hint">
+      Every incident is placed at the coordinates of the camera that saw it.
+      Click a marker for details and the frame that triggered it.
+      Severity 4 and 5 pan the map automatically.
+    </div>
+    <h3>INCIDENTS</h3>
+    <div id="list"></div>
+  </aside>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/dashboard/aicos-auth.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ---- CONFIG: set your city and response stations ---- */
+  var CONFIG = {
+    BACKEND_URL: "",                            // empty = same host serving this page
+    CITY_CENTER: [34.88803, 3.490238],          // [lat, lon]
+    ZOOM: 13,
+    // EDIT: replace with real nearby stations (long-press each in Google
+    // Maps to copy its coordinates). Until then the "nearest" distance in
+    // each popup is meaningless.
+    STATIONS: [
+      { name: "Police station",  type: "police",    lat: 34.8890, lon: 3.4890 },
+      { name: "Fire station",    type: "fire",      lat: 34.8865, lon: 3.4925 },
+      { name: "Clinic",          type: "ambulance", lat: 34.8875, lon: 3.4880 }
+    ]
+  };
+  /* ----------------------------------------------------- */
+
+  var SEV_COLORS = { 1:"#64748b", 2:"#38bdf8", 3:"#fbbf24", 4:"#fb923c", 5:"#f43f5e" };
+  var STATION_COLORS = { police:"#7da7f5", fire:"#f97316", ambulance:"#34d399" };
+
+  var map = null, ws = null, reconnectTimer = null;
+  var markers = {}, events = {}, seen = {};
+  var baseUrl = "";
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function setStatus(live, txt) {
+    $("statusDot").className = live ? "dot live" : "dot";
+    $("statusTxt").textContent = txt;
+  }
+
+  function fmtTime(ts) {
+    var d = ts ? new Date(ts * 1000) : new Date();
+    return d.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit", second:"2-digit" });
+  }
+
+  function backendBase() {
+    return (CONFIG.BACKEND_URL || window.location.origin).replace(/\/+$/, "");
+  }
+  function authToken() {
+    var t = (window.AicosAuth && AicosAuth.token()) || "";
+    if (!t) { window.location.href = "/dashboard/login.html"; }
+    return t;
+  }
+  function authHeaders(){ var t=authToken(); return t?{Authorization:"Bearer "+t}:{}; }
+  window.aicosMapEvidence = function(id, kind){
+    fetch(backendBase()+"/api/events/"+id+"/"+kind,{headers:authHeaders()})
+      .then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.blob()})
+      .then(function(b){var u=URL.createObjectURL(b);window.open(u,"_blank","noopener");setTimeout(function(){URL.revokeObjectURL(u)},60000)})
+      .catch(function(){alert("Protected evidence could not be loaded. Sign in again.")});
+  };
+
+  function initMap() {
+    map = L.map("map", { zoomControl: true }).setView(CONFIG.CITY_CENTER, CONFIG.ZOOM);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    CONFIG.STATIONS.forEach(function (st) {
+      L.circleMarker([st.lat, st.lon], {
+        radius: 7,
+        color: "#060a12",
+        weight: 2,
+        fillColor: STATION_COLORS[st.type] || "#7da7f5",
+        fillOpacity: 1
+      }).addTo(map).bindPopup("<b>" + st.name + "</b><br>" + st.type);
+    });
+  }
+
+  function distanceKm(a, b) {
+    var R = 6371, rad = Math.PI / 180;
+    var dLat = (b[0] - a[0]) * rad, dLon = (b[1] - a[1]) * rad;
+    var s = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(a[0]*rad) * Math.cos(b[0]*rad) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+    return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+  }
+
+  function nearestStation(lat, lon) {
+    var best = null, bestD = Infinity;
+    CONFIG.STATIONS.forEach(function (st) {
+      var d = distanceKm([lat, lon], [st.lat, st.lon]);
+      if (d < bestD) { best = st; bestD = d; }
+    });
+    return best ? { station: best, km: bestD } : null;
+  }
+
+  function popupHtml(ev) {
+    var near = nearestStation(ev.lat, ev.lon);
+    var html = "<b>" + ev.type + "</b><br>" +
+      "SEV " + ev.severity + " · conf " + Math.round((ev.confidence || 0) * 100) + "%<br>" +
+      fmtTime(ev.ts) + " · " + (ev.source_id || "") +
+      (ev.district ? " · " + ev.district : "") + "<br>" +
+      ev.lat.toFixed(5) + ", " + ev.lon.toFixed(5);
+    if (near) {
+      html += "<br><span style='color:#5eead4'>nearest: " + near.station.name +
+              " (" + near.km.toFixed(1) + " km)</span>";
+    }
+    html += "<br><a href='https://www.openstreetmap.org/?mlat=" + ev.lat +
+            "&mlon=" + ev.lon + "#map=18/" + ev.lat + "/" + ev.lon +
+            "' target='_blank' style='color:#5eead4'>open in maps</a>";
+    if (ev.has_clip) {
+      html += "<br><button onclick=\"aicosMapEvidence("+ev.id+",'clip')\">Open protected lead-up clip</button>";
+    } else if (ev.has_snapshot) {
+      html += "<br><button onclick=\"aicosMapEvidence("+ev.id+",'snapshot')\">Open protected snapshot</button>";
+    }
+    return html;
+  }
+
+  function addEvent(ev, isLive) {
+    if (!ev || typeof ev.lat !== "number" || typeof ev.lon !== "number") { return; }
+    if (!ev.lat && !ev.lon) { return; }           // camera has no coordinates set
+    if (seen[ev.id]) { return; }
+    seen[ev.id] = true;
+    events[ev.id] = ev;
+
+    var color = SEV_COLORS[ev.severity] || "#64748b";
+    var marker = L.circleMarker([ev.lat, ev.lon], {
+      radius: ev.severity >= 4 ? 11 : 7,
+      color: "#060a12",
+      weight: 2,
+      fillColor: color,
+      fillOpacity: 0.9
+    }).addTo(map);
+    marker.bindPopup(popupHtml(ev));
+    markers[ev.id] = marker;
+
+    if (isLive && ev.severity >= 4) {
+      map.panTo([ev.lat, ev.lon]);
+      marker.openPopup();
+    }
+    renderList();
+  }
+
+  function renderList() {
+    var box = $("list");
+    box.textContent = "";
+    var ids = Object.keys(events).sort(function (a, b) { return b - a; }).slice(0, 30);
+    ids.forEach(function (id) {
+      var ev = events[id];
+      var row = document.createElement("div");
+      row.className = "row";
+      if (ev.has_snapshot) {
+        var img = document.createElement("img");
+        fetch(backendBase()+"/api/events/"+ev.id+"/snapshot",{headers:authHeaders()})
+          .then(function(r){if(!r.ok)throw 0;return r.blob()}).then(function(b){img.src=URL.createObjectURL(b)}).catch(function(){img.remove()});
+        row.appendChild(img);
+      }
+      var sev = document.createElement("span");
+      sev.className = "sev";
+      var c = SEV_COLORS[ev.severity] || "#64748b";
+      sev.style.color = c; sev.style.borderColor = c;
+      sev.textContent = "S" + ev.severity;
+      var label = document.createElement("span");
+      label.style.cssText = "flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+      label.textContent = ev.type;
+      row.appendChild(sev); row.appendChild(label);
+      row.onclick = function () {
+        map.setView([ev.lat, ev.lon], 17);
+        if (markers[ev.id]) { markers[ev.id].openPopup(); }
+      };
+      box.appendChild(row);
+    });
+  }
+
+  function handleMessage(raw) {
+    var msg;
+    try { msg = JSON.parse(raw); } catch (e) { return; }
+    if (msg.kind === "snapshot" && Array.isArray(msg.events)) {
+      msg.events.slice().reverse().forEach(function (ev) { addEvent(ev, false); });
+    } else if (msg.kind === "event" && msg.event) {
+      addEvent(msg.event, true);
+    }
+  }
+
+  function connect() {
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    baseUrl = backendBase();
+    if (ws) {
+      try {
+        ws.onclose = null; ws.onerror = null; ws.onmessage = null; ws.onopen = null;
+        ws.close();
+      } catch (e) {}
+      ws = null;
+    }
+    setStatus(false, "CONNECTING…");
+    var token = authToken();
+    try { ws = new WebSocket(baseUrl.replace(/^http/, "ws") + "/ws/events"); }
+    catch (e) { setStatus(false, "BAD URL"); return; }
+    ws.onopen = function () { ws.send(JSON.stringify({kind:"auth", token:token})); setStatus(true, "LIVE"); };
+    ws.onmessage = function (evt) { handleMessage(evt.data); };
+    ws.onclose = function () {
+      setStatus(false, "RECONNECTING");
+      reconnectTimer = setTimeout(connect, 3000);
+    };
+    ws.onerror = function () { try { ws.close(); } catch (e) {} };
+  }
+
+  initMap();
+  connect();
+})();
+</script>
+</body>
+</html>

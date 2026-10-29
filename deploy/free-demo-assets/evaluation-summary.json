@@ -1,0 +1,42 @@
+{
+  "clips": 13,
+  "controlled_fall_clips": 4,
+  "fall_clips_with_alert": 4,
+  "ordinary_clips": 9,
+  "ordinary_clips_with_alert": 0,
+  "ordinary_duration_seconds": 62.7,
+  "extra_alerts_in_same_source": 1,
+  "positive_clip_results": [
+    {
+      "clip": "videos__fall__05_vertical_fall_faint.mp4",
+      "alert_seconds": [
+        8.433333333333334
+      ]
+    },
+    {
+      "clip": "videos__fall__03_lateral_fall_walking.mp4",
+      "alert_seconds": [
+        8.766666666666667
+      ]
+    },
+    {
+      "clip": "videos__fall__01_forward_fall_walking.mp4",
+      "alert_seconds": [
+        7.433333333333334,
+        9.5
+      ]
+    },
+    {
+      "clip": "videos__fall__02_fall_backward.mp4",
+      "alert_seconds": [
+        6.766666666666667
+      ]
+    }
+  ],
+  "production_99_percent_claim_supported": false,
+  "live_profile_changed": false,
+  "all_same_reference_dataset": true,
+  "independent_holdout_sites": 0,
+  "scope": "Candidate development/reference tests only; first 5 used to diagnose/tune, next 8 predeclared. Multiview composed references.",
+  "live_inference": false
+}

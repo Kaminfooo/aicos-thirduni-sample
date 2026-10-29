@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AICOS Operator Triage Assistant</title>
+<style>
+body{margin:0;background:#071014;color:#e7f4f3;font:16px system-ui,sans-serif}main{max-width:1100px;margin:auto;padding:24px}h1{font-size:25px}section{padding:18px;margin:16px 0;border:1px solid #31545c;border-radius:10px;background:#0d1b20}.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}input,button,textarea{font:inherit;padding:10px;border:1px solid #31545c;border-radius:6px;background:#10252b;color:#e7f4f3}button{cursor:pointer}button:disabled{opacity:.5;cursor:default}textarea{box-sizing:border-box;width:100%;min-height:72px}.muted{color:#93afb5}.notice{color:#ffd166}a{color:#69e6c5}dt{color:#93afb5}dd{margin:0 0 10px;overflow-wrap:anywhere}img{max-width:100%;max-height:280px}li{margin:8px 0}.error{color:#ff9696}dl.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 22px}dl.facts dd{margin:2px 0 0}.media-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}figure{margin:0}figcaption{color:#93afb5;margin-bottom:8px}summary{cursor:pointer}section[id]{scroll-margin-top:16px}@media(max-width:640px){dl.facts,.media-grid{grid-template-columns:1fr}main{padding:12px}}
+</style><link rel="stylesheet" href="/dashboard/aicos-light.css">
+</head><body class="workspace">
+<nav class="workspace-nav" aria-label="Main navigation"><a class="brand" href="/dashboard/live-ops.html">AICOS</a><a href="/dashboard/live-ops.html">Incidents</a><a href="/dashboard/fleet.html">Camera health</a><a href="/dashboard/triage.html" aria-current="page">Triage assistant</a><a href="/dashboard/forensics.html">Evidence search</a><a class="nav-signin" href="/dashboard/login.html">Account / sign in</a></nav><main>
+<h1>Operator Triage Assistant</h1><p class="muted">Review incident evidence and the relevant procedure. A human decision is required. Reviewing a draft does not dispatch anyone.</p>
+<div class="bar"><label>Incident ID <input id="incident" type="number" min="1" step="1" style="width:110px"></label><button id="create">Create review draft</button><button id="load">Show drafts</button><a href="/dashboard/login.html">Sign in</a><a href="/dashboard/live-ops.html">Live operations</a></div>
+<p id="message" role="status"></p><div id="history"></div><div id="draft"></div>
+</main><script src="/dashboard/aicos-auth.js"></script><script>
+'use strict';
+const $=id=>document.getElementById(id);let current=null;let urls=[];
+function node(tag,text,parent){const element=document.createElement(tag);if(text!==undefined)element.textContent=text;if(parent)parent.appendChild(element);return element}
+async function api(path,method='GET',body){const options={method,headers:AicosAuth.headers({'Content-Type':'application/json'})};if(body!==undefined)options.body=JSON.stringify(body);const response=await fetch(path,options);const data=await response.json();if(!response.ok)throw Error(response.status===401?'Sign in in this tab first.':data.detail||'Request failed');return data}
+function eventId(){const id=Number($('incident').value);if(!Number.isSafeInteger(id)||id<1)throw Error('Enter a valid incident ID.');return id}
+function section(title){const s=node('section',undefined,$('draft'));node('h2',title,s);return s}
+function factValue(key,value){if(key==='event_time')return new Date(Number(value)*1000).toLocaleString();if(key==='model_score')return Math.round(Number(value)*100)+'% model score';if(key==='transition_observation')return String(value).replaceAll('_',' ');return String(value)}
+async function show(draft){
+ current=draft;urls.forEach(URL.revokeObjectURL);urls=[];$('draft').replaceChildren();
+ const content=draft.content;const intro=section('Draft '+draft.id);node('p','Review status: '+draft.review_status.replaceAll('_',' '),intro);
+ if(draft.reviewed_at){node('p','Reviewed by '+draft.reviewed_by+' · '+new Date(draft.reviewed_at*1000).toLocaleString(),intro);node('p','Review note: '+(draft.review_note||'No note recorded.'),intro)}
+ const jump=node('a','Go to human review',intro);jump.href='#human-review';
+ if(content.production_recommendations_blocked){const p=node('p','Demonstration only: no approved operating procedure is available. Production recommendations are blocked.',intro);p.className='notice'}
+ const facts=section('Incident evidence');const list=node('dl',undefined,facts);list.className='facts';for(const [key,value] of Object.entries(content.facts)){const pair=node('div',undefined,list);node('dt',key.replaceAll('_',' '),pair);node('dd',factValue(key,value),pair)}
+ node('p','A model score is detector output, not certainty about what happened.',facts);
+ node('p','Missing media: '+(content.missing_evidence.join(', ')||'none'),facts);
+ const gallery=node('div',undefined,facts);gallery.className='media-grid';for(const [kind,media] of Object.entries(content.media)){if(media.available){const figure=node('figure',undefined,gallery);node('figcaption',kind==='snapshot'?'Triggering image':'Recorded evidence clip',figure);try{const response=await fetch(media.reference,{headers:AicosAuth.headers()});if(!response.ok)throw Error();const url=URL.createObjectURL(await response.blob());urls.push(url);const image=node('img',undefined,figure);image.src=url;image.alt=kind+' evidence for incident '+draft.event_id}catch(e){node('p','Could not load '+kind+' evidence.',figure)}}}
+ const procedure=section(content.production_recommendations_blocked?'Demonstration review steps':'Procedure-grounded recommendations');
+ if(content.procedure)node('p',content.procedure.title+' · version '+content.procedure.version+' · '+content.procedure.status,procedure);
+ const steps=node('ol',undefined,procedure);for(const text of [...content.recommendations,...content.demonstration_steps])node('li',text,steps);
+ const references=section('Sources and limits');node('p',content.signed_evidence.ok?'Signed evidence verified.':'Signed evidence unavailable or not verified.',references);for(const source of content.source_references)node('p',source.id+(source.status?' · '+source.status:''),references);const details=node('details',undefined,references);node('summary','Source fingerprints',details);for(const source of content.source_references){if(source.sha256)node('p',source.id+' · SHA-256 '+source.sha256,details)}for(const text of content.limits)node('p',text,references);
+ const review=section('Human review');review.id='human-review';const noteLabel=node('label','Review note',review);noteLabel.htmlFor='review-note';const note=node('textarea',undefined,review);note.id='review-note';note.maxLength=500;note.placeholder='Record your review note';note.value=draft.review_note||'';note.disabled=draft.review_status!=='pending';
+ for(const [decision,label] of [['accept',content.production_recommendations_blocked?'Accept demonstration draft':'Accept draft'],['reject','Reject draft']]){const button=node('button',label,review);button.disabled=draft.review_status!=='pending';button.onclick=async()=>{button.disabled=true;try{await show(await api('/api/triage/'+draft.id+'/review','POST',{decision,note:note.value}));$('message').textContent='Review recorded. Incident approval remains a separate action.'}catch(e){$('message').textContent=e.message;button.disabled=false}}}
+}
+async function run(action){$('message').className='';$('message').textContent='Loading…';try{await action();if($('message').textContent==='Loading…')$('message').textContent='Ready.'}catch(e){$('message').textContent=e.message;$('message').className='error'}}
+$('create').onclick=()=>run(async()=>show(await api('/api/events/'+eventId()+'/triage','POST',{})));
+$('load').onclick=()=>run(async()=>{const result=await api('/api/events/'+eventId()+'/triage');$('history').replaceChildren();for(const draft of result.drafts){const button=node('button','Draft '+draft.id+' · '+draft.review_status.replaceAll('_',' '),$('history'));button.onclick=()=>run(async()=>show(await api('/api/triage/'+draft.id)))}if(!result.drafts.length)node('p','No drafts yet.',$('history'))});
+const parameter=new URLSearchParams(location.search).get('event_id');if(parameter&&/^\d+$/.test(parameter))$('incident').value=parameter;
+if(!AicosAuth.token())$('message').textContent='Sign in in this tab to review incidents.';
+</script></body></html>

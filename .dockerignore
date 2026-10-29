@@ -1,0 +1,13 @@
+.git
+.runtime
+.venv
+.venv-inference
+__pycache__
+*.pyc
+data
+results
+runs
+*.db
+*.pem
+*.key
+*.dpapi

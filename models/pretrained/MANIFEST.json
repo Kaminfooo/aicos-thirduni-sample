@@ -1,0 +1,31 @@
+{
+  "purpose": "Local ThirdUni engineering comparison, not proof of field accuracy",
+  "models": [
+    {
+      "name": "yolo26n-pose.pt",
+      "url": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo26n-pose.pt",
+      "bytes": 7878574,
+      "sha256": "eb3bb8268828aeaf515cec23a4bfafd793944a86fe9af94ba7823609c14522a9"
+    },
+    {
+      "name": "yolov8s-pose.pt",
+      "url": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolov8s-pose.pt",
+      "bytes": 23513657,
+      "sha256": "234314cd8baf62616791aceb9ea6ad5c19f26cf6c0d8f3a1bfce1e23b186cfb3"
+    },
+    {
+      "name": "human-fall-yolo11.pt",
+      "url": "https://huggingface.co/melihuzunoglu/human-fall-detection/resolve/97261b03632a9715a27481b2cfdac6a78e26d2d9/best.pt",
+      "bytes": 5472282,
+      "sha256": "3f56ad30358d5c63bf8dbc0c1299cf68818c3d291dfb10c94107b94110aadd4c",
+      "revision": "97261b03632a9715a27481b2cfdac6a78e26d2d9",
+      "license": "agpl-3.0"
+    }
+  ],
+  "licenses": {
+    "Ultralytics pose models": "AGPL-3.0 per publisher; commercial deployment terms must be reviewed",
+    "community fall model": "AGPL-3.0 per Hugging Face model card; training-data provenance not independently verified"
+  },
+  "source": "Official Ultralytics assets release v8.4.0; pinned Hugging Face repository revision",
+  "training": "None; inference only"
+}

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="referrer" content="no-referrer">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AICOS · Live Operations</title>
+<style>
+
+  :root {
+    --ink: #060a12; --panel: #0b111e; --line: rgba(125,150,190,0.14);
+    --teal: #5eead4; --text: #dbe4f3; --mut: #7c8aa5; --red: #f43f5e; --amber: #fbbf24;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--ink); color: var(--text); font-family: 'IBM Plex Mono', monospace; padding: 14px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .logo { background: var(--teal); color: #04211c; font-family: 'Chakra Petch', sans-serif;
+          font-weight: 700; letter-spacing: 2px; padding: 6px 12px; border-radius: 5px; }
+  .sub { font-size: 10px; color: var(--mut); letter-spacing: 1.5px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  .bar { padding: 10px 12px; margin-top: 12px; }
+  input { background: #070c16; border: 1px solid var(--line); color: var(--text);
+          font: inherit; font-size: 12px; padding: 6px 8px; border-radius: 5px; min-width: 220px; }
+  button { background: var(--teal); color: #04211c; border: 0; border-radius: 5px;
+           font-family: 'Chakra Petch', sans-serif; font-weight: 600; font-size: 11px;
+           letter-spacing: .5px; padding: 7px 14px; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--mut); border: 1px solid var(--line); }
+  button:hover { opacity: .88; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); display: inline-block; }
+  .dot.live { background: var(--teal); animation: blink 1.4s infinite; }
+  @keyframes blink { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
+  .kpis { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+         padding: 8px 14px; min-width: 110px; }
+  .kpi .lbl { font-size: 9px; letter-spacing: 1.6px; color: var(--mut); text-transform: uppercase;
+              font-family: 'Chakra Petch', sans-serif; }
+  .kpi .val { font-size: 20px; font-weight: 600; margin-top: 3px; }
+  #feed { margin-top: 12px; max-height: 62vh; overflow-y: auto; }
+  .ev { display: flex; gap: 10px; align-items: center; padding: 9px 12px;
+        border-bottom: 1px solid rgba(125,150,190,0.08); border-left: 3px solid var(--mut); }
+  .ev .t { font-size: 12px; font-weight: 600; }
+  .ev .m { font-size: 10px; color: var(--mut); }
+  .ev .grow { flex: 1; min-width: 0; }
+  .sev { font-size: 9px; font-weight: 700; letter-spacing: 1px; padding: 2px 7px;
+         border-radius: 4px; border: 1px solid; }
+  .st  { font-size: 9px; letter-spacing: 1.2px; color: var(--mut); text-transform: uppercase; }
+  .act { font-size: 10px; padding: 4px 9px; }
+  .empty { padding: 30px; color: var(--mut); font-size: 12px; }
+  .clipbtn { font-size: 9px; padding: 3px 7px; border-radius: 4px; cursor: pointer;
+             background: transparent; color: var(--amber); border: 1px solid var(--amber);
+             font-family: 'Chakra Petch', sans-serif; font-weight: 600; letter-spacing: .5px; }
+  .clipbtn:hover { background: rgba(251,191,36,.12); }
+  .thumb { width: 74px; height: 46px; object-fit: cover; border-radius: 4px;
+           border: 1px solid var(--line); cursor: pointer; background: #070c16; }
+  .thumb:hover { border-color: var(--teal); }
+  #imodal { position: fixed; inset: 0; background: rgba(6,10,18,.94); display: none;
+            align-items: center; justify-content: center; padding: 20px; z-index: 70; }
+  #imodal img { max-width: 96vw; max-height: 86vh; border-radius: 8px;
+                border: 1px solid var(--line); }
+  #imodal .cap { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center;
+                 font-size: 11px; color: var(--mut); }
+  #rmodal { position: fixed; inset: 0; background: rgba(6,10,18,.92); display: none;
+            align-items: center; justify-content: center; padding: 18px; z-index: 60; }
+  #rmodal .box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+                 max-width: 760px; width: 100%; max-height: 86vh; display: flex; flex-direction: column; }
+  #rmodal .bar2 { display: flex; gap: 8px; align-items: center; padding: 10px 14px;
+                  border-bottom: 1px solid var(--line);
+                  font-family: 'Chakra Petch', sans-serif; font-size: 12px; letter-spacing: 2px; }
+  #rmodal pre { margin: 0; padding: 14px; overflow: auto; font-size: 11px; line-height: 1.55;
+                color: var(--text); white-space: pre-wrap; }
+  ::-webkit-scrollbar { width: 5px } ::-webkit-scrollbar-thumb { background: rgba(125,150,190,.25); border-radius: 4px }
+</style>
+<link rel="stylesheet" href="/dashboard/aicos-light.css">
+</head>
+<body class="workspace">
+<nav class="workspace-nav" aria-label="Main navigation"><a class="brand" href="/dashboard/live-ops.html">AICOS</a><a href="/dashboard/live-ops.html" aria-current="page">Incidents</a><a href="/dashboard/fleet.html">Camera health</a><a href="/dashboard/triage.html">Triage assistant</a><a href="/dashboard/forensics.html">Evidence search</a><a class="nav-signin" href="/dashboard/login.html">Account / sign in</a></nav>
+
+<div class="row">
+  <span class="logo">AICOS</span>
+  <div>
+    <div style="font-family:'Chakra Petch',sans-serif; font-size:12px; letter-spacing:2px;">LIVE OPERATIONS</div>
+    <div class="sub">Incident monitoring · evidence · human review</div>
+  </div>
+  <span style="flex:1"></span>
+  <span id="statusDot" class="dot"></span>
+  <span id="statusTxt" class="sub">DISCONNECTED</span>
+</div>
+
+<script src="/dashboard/aicos-auth.js"></script>
+<div class="panel bar row">
+  <details><summary>Advanced connection settings</summary><div class="row" style="margin-top:10px">
+  <input id="apiUrl" placeholder="Backend URL (blank = this server)" aria-label="Backend URL" autocomplete="off" />
+  <input id="apiKey" placeholder="Optional session token override" aria-label="Session token override" type="password" autocomplete="off" />
+  </div></details>
+  <button id="btnConnect">CONNECT</button>
+  <button id="btnLogin" onclick="location.href='/dashboard/login.html'">SIGN IN</button>
+  <span class="sub">Uses your sign-in session. Leave advanced settings unchanged for this server.</span>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="lbl">Events</div><div class="val" id="kTotal">0</div></div>
+  <div class="kpi"><div class="lbl">High severity</div><div class="val" id="kHigh" style="color:var(--red)">0</div></div>
+  <div class="kpi"><div class="lbl">Security</div><div class="val" id="kSec">0</div></div>
+  <div class="kpi"><div class="lbl">Event sources</div><div class="val" id="kCams">0</div></div>
+  <div class="kpi"><div class="lbl">Last event</div><div class="val" id="kLast" style="font-size:13px">—</div></div>
+</div>
+
+<div class="feed-heading"><div><h1>Incident workspace</h1><p>Review evidence, assess the context and record your decision.</p></div><span class="sub">Recorded inputs are labelled REPLAY</span></div>
+<div class="panel" id="feed">
+  <div class="empty" id="emptyMsg">Connect to the backend to stream live events. Events appear here the moment a camera or edge worker reports them.</div>
+</div>
+
+<div id="imodal">
+  <img id="imodalImg" alt="event snapshot" />
+  <div class="cap" id="imodalCap">tap anywhere to close</div>
+</div>
+
+<div id="rmodal">
+  <div class="box">
+    <div class="bar2">
+      <b>INCIDENT REPORT</b>
+      <span style="flex:1"></span>
+      <button class="act" id="btnCopyReport">COPY</button>
+      <button class="act ghost" id="btnCloseReport">CLOSE</button>
+    </div>
+    <pre id="reportText">Loading…</pre>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var AGENT_COLORS = { security: "#fb7185", emergency: "#f97316", traffic: "#fbbf24",
+                       infrastructure: "#38bdf8", environmental: "#34d399" };
+  var SEV_COLORS = { 1: "#526176", 2: "#0369a1", 3: "#936000", 4: "#a34b08", 5: "#b4233e" };
+  var MAX_ROWS = 200;
+
+  var ws = null;
+  var stats = { total: 0, high: 0, sec: 0, cams: {} };
+  var baseUrl = "";
+  var seen = {};                 // event ids already displayed and counted
+  var reconnectTimer = null;
+
+  // Every reconnect replays a snapshot of recent events. Without this
+  // guard the KPI counters and the feed would multiply on each reconnect.
+  function isNew(ev) {
+    if (!ev || ev.id === undefined || seen[ev.id]) { return false; }
+    seen[ev.id] = true;
+    return true;
+  }
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function authToken() { return ($("apiKey").value || (window.AicosAuth && AicosAuth.token()) || "").trim(); }
+  function authHeaders(extra) {
+    var h = extra || {}, t = authToken();
+    if (t) h.Authorization = "Bearer " + t;
+    return h;
+  }
+  if (window.AicosAuth && AicosAuth.token()) { $("apiKey").value = AicosAuth.token(); }
+
+  function loadMedia(path, caption) {
+    fetch((baseUrl || window.location.origin) + path, {headers:authHeaders({})})
+      .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.blob(); })
+      .then(function(blob){ var u=URL.createObjectURL(blob); showImage(u, caption); setTimeout(function(){URL.revokeObjectURL(u)}, 60000); })
+      .catch(function(){ alert("Could not load protected evidence. Sign in again."); });
+  }
+
+  function setStatus(live, txt) {
+    $("statusDot").className = live ? "dot live" : "dot";
+    $("statusTxt").textContent = txt;
+  }
+
+  function fmtTime(ts) {
+    var d = ts ? new Date(ts * 1000) : new Date();
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+
+  function bump(ev) {
+    stats.total += 1;
+    if (ev.severity >= 4) stats.high += 1;
+    if (ev.agent === "security") stats.sec += 1;
+    if (ev.source_id) stats.cams[ev.source_id] = true;
+    $("kTotal").textContent = String(stats.total);
+    $("kHigh").textContent = String(stats.high);
+    $("kSec").textContent = String(stats.sec);
+    $("kCams").textContent = String(Object.keys(stats.cams).length);
+    $("kLast").textContent = fmtTime(ev.ts);
+  }
+
+  function setRowStatus(row, status) {
+    var st = row.querySelector(".st");
+    if (st) st.textContent = status;
+  }
+
+  function postStatus(id, status, row) {
+    fetch(baseUrl + "/api/events/" + id + "/status", {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ status: status })
+    }).then(function (r) {
+      if (r.ok) { setRowStatus(row, status); }
+      else { alert("Backend refused (" + r.status + ") — check the API key field."); }
+    }).catch(function () { alert("Backend unreachable."); });
+  }
+
+  function showImage(src, caption) {
+    $("imodalImg").src = src;
+    $("imodalCap").textContent = caption + " — tap anywhere to close";
+    $("imodal").style.display = "flex";
+  }
+  $("imodal").onclick = function () { $("imodal").style.display = "none"; };
+
+  function showReport(id) {
+    var base = baseUrl || window.location.origin.replace(/\/+$/, "");
+    var pre = $("reportText");
+    $("rmodal").style.display = "flex";
+    pre.textContent = "Generating report…";
+    fetch(base + "/api/events/" + id + "/report?format=text", {
+      headers: authHeaders({})
+    }).then(function (r) {
+      if (r.status === 401) { pre.textContent = "Session expired. Sign in again in this tab, then reopen the report."; return null; }
+      if (!r.ok) { pre.textContent = "Report failed (" + r.status + ")."; return null; }
+      return r.text();
+    }).then(function (t) { if (t) pre.textContent = t; })
+      .catch(function () { pre.textContent = "Backend unreachable."; });
+  }
+
+  $("btnCloseReport").onclick = function () { $("rmodal").style.display = "none"; };
+  $("btnCopyReport").onclick = function () {
+    var t = $("reportText").textContent || "";
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t);
+    } else {
+      var ta = document.createElement("textarea");
+      ta.value = t; document.body.appendChild(ta); ta.select();
+      document.execCommand("copy"); document.body.removeChild(ta);
+    }
+  };
+
+  function addRow(ev, prepend) {
+    $("emptyMsg") && $("emptyMsg").remove();
+    var row = document.createElement("div");
+    row.className = "ev";
+    row.dataset.id = String(ev.id);
+    row.style.borderLeftColor = AGENT_COLORS[ev.agent] || "#64748b";
+
+    var grow = document.createElement("div");
+    grow.className = "grow";
+    var t = document.createElement("div");
+    t.className = "t";
+    t.textContent = ev.type || "event";
+    var m = document.createElement("div");
+    m.className = "m";
+    m.textContent = fmtTime(ev.ts) + " · " + (ev.source_id || "?") +
+      (ev.district ? " · " + ev.district : "") +
+      " · model score " + Math.round((ev.confidence || 0) * 100) + "%" +
+      (ev.extra && ev.extra.is_replay ? " · RECORDED REPLAY" : "");
+    grow.appendChild(t); grow.appendChild(m);
+
+    var sev = document.createElement("span");
+    sev.className = "sev";
+    var sc = SEV_COLORS[ev.severity] || "#64748b";
+    sev.style.color = sc; sev.style.borderColor = sc;
+    sev.textContent = "SEV " + ev.severity;
+
+    var st = document.createElement("span");
+    st.className = "st";
+    st.textContent = ev.status || "detected";
+
+    if (ev.has_snapshot) {
+      var img = document.createElement("img");
+      img.className = "thumb";
+      img.loading = "lazy";
+      img.alt = "snapshot";
+      img.alt = "protected snapshot";
+      img.removeAttribute("src");
+      // A thumbnail is loaded with authenticated fetch; never put credentials in URLs.
+      fetch((baseUrl || window.location.origin) + "/api/events/" + ev.id + "/snapshot", {headers:authHeaders({})})
+        .then(function(r){if(!r.ok) throw 0; return r.blob()}).then(function(b){img.src=URL.createObjectURL(b)}).catch(function(){img.remove()});
+      img.onclick = function () { loadMedia("/api/events/" + ev.id + "/snapshot", ev.type + " · " + fmtTime(ev.ts)); };
+      row.insertBefore(img, row.firstChild);
+    }
+    row.appendChild(grow); row.appendChild(sev); row.appendChild(st);
+
+    if (ev.has_clip) {
+      var cb = document.createElement("button");
+      cb.className = "clipbtn"; cb.textContent = "CLIP";
+      cb.onclick = function () {
+        loadMedia("/api/events/" + ev.id + "/clip",
+                  ev.type + " · the " + (ev.extra && ev.extra.snapshot_lead_seconds
+                    ? ev.extra.snapshot_lead_seconds + "s " : "") + "lead-up");
+      };
+      row.appendChild(cb);
+    }
+    var rp = document.createElement("button");
+    rp.className = "act ghost"; rp.textContent = "REPORT";
+    rp.onclick = function () { showReport(ev.id); };
+    row.appendChild(rp);
+    var triage = document.createElement("button");
+    triage.className = "act ghost"; triage.textContent = "TRIAGE";
+    triage.onclick = function () { location.href = "/dashboard/triage.html?event_id=" + encodeURIComponent(ev.id); };
+    row.appendChild(triage);
+
+    if (ev.severity >= 4) {
+      var ok = document.createElement("button");
+      ok.className = "act"; ok.textContent = "APPROVE";
+      ok.onclick = function () { postStatus(ev.id, "approved", row); };
+      var no = document.createElement("button");
+      no.className = "act ghost"; no.textContent = "DISMISS";
+      no.onclick = function () { postStatus(ev.id, "dismissed", row); };
+      row.appendChild(ok); row.appendChild(no);
+    }
+
+    var feed = $("feed");
+    if (prepend && feed.firstChild) { feed.insertBefore(row, feed.firstChild); }
+    else { feed.appendChild(row); }
+    while (feed.children.length > MAX_ROWS) { feed.removeChild(feed.lastChild); }
+  }
+
+  function handleMessage(raw) {
+    var msg;
+    try { msg = JSON.parse(raw); } catch (e) { return; }
+    if (msg.kind === "snapshot" && Array.isArray(msg.events)) {
+      setStatus(true, "CONNECTED");
+      var fresh = msg.events.filter(isNew);
+      fresh.forEach(function (ev) { addRow(ev, false); });
+      // count history too, oldest -> newest so "last event" ends up correct
+      fresh.slice().reverse().forEach(function (ev) { bump(ev); });
+    } else if (msg.kind === "event" && msg.event) {
+      if (isNew(msg.event)) {
+        addRow(msg.event, true);
+        bump(msg.event);
+      }
+    } else if (msg.kind === "status") {
+      var row = document.querySelector('.ev[data-id="' + msg.id + '"]');
+      if (row) setRowStatus(row, msg.status);
+    }
+  }
+
+  function connect() {
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    baseUrl = ($("apiUrl").value || window.location.origin).replace(/\/+$/, "");
+    var key = authToken();
+    if (!key) { setStatus(false, "SIGN IN REQUIRED"); return; }
+    var wsUrl = baseUrl.replace(/^http/, "ws") + "/ws/events";
+    // Detach handlers before closing, or the old socket's onclose schedules
+    // a second reconnect and the two sockets both feed the dashboard.
+    if (ws) {
+      try {
+        ws.onclose = null; ws.onerror = null; ws.onmessage = null; ws.onopen = null;
+        ws.close();
+      } catch (e) {}
+      ws = null;
+    }
+    setStatus(false, "CONNECTING…");
+    try { ws = new WebSocket(wsUrl); }
+    catch (e) { setStatus(false, "BAD URL"); return; }
+
+    ws.onopen = function () { ws.send(JSON.stringify({kind:"auth", token:key})); setStatus(false, "AUTHENTICATING…"); };
+    ws.onmessage = function (evt) { handleMessage(evt.data); };
+    ws.onclose = function (event) {
+      if (event && (event.code === 4401 || event.code === 4403 || event.code === 1008)) {
+        setStatus(false, "SESSION EXPIRED — SIGN IN"); return;
+      }
+      setStatus(false, "DISCONNECTED — retrying");
+      reconnectTimer = setTimeout(connect, 3000);
+    };
+    ws.onerror = function () { try { ws.close(); } catch (e) {} };
+  }
+
+  $("btnConnect").onclick = connect;
+  // Auto-connect when the page is served by the backend itself.
+  if (window.location.protocol.indexOf("http") === 0 && $("apiKey").value) { connect(); }
+})();
+</script>
+</body>
+</html>

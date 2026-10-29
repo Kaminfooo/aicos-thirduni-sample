@@ -1,0 +1,32 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AICOS Camera Fleet</title>
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#071014;color:#e7f4f3;margin:0}header{padding:18px 24px;background:#0d1b20;border-bottom:1px solid #24434a}main{padding:20px;max-width:1400px;margin:auto}.bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}input,button{background:#10252b;color:#e7f4f3;border:1px solid #31545c;border-radius:6px;padding:9px 11px}button{cursor:pointer}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}.card{background:#0d1b20;border:1px solid #203d44;border-radius:10px;padding:14px}.ok{color:#69e6a6}.warn{color:#ffd166}.bad{color:#ff6b6b}.muted{color:#88a8ae}.score{font-size:26px;font-weight:700}.row{display:flex;justify-content:space-between;gap:12px;padding:3px 0}.pill{padding:2px 7px;border-radius:999px;background:#153139;font-size:12px}code{font-size:12px}
+</style><link rel="stylesheet" href="/dashboard/aicos-light.css">
+</head>
+<body class="workspace">
+<nav class="workspace-nav" aria-label="Main navigation"><a class="brand" href="/dashboard/live-ops.html">AICOS</a><a href="/dashboard/live-ops.html">Incidents</a><a href="/dashboard/fleet.html" aria-current="page">Camera health</a><a href="/dashboard/triage.html">Triage assistant</a><a href="/dashboard/forensics.html">Evidence search</a><a class="nav-signin" href="/dashboard/login.html">Account / sign in</a></nav><header><strong>AICOS Government Edition - Camera Fleet & Integrity</strong></header>
+<main><div class="bar"><input id="base" type="url" name="backend_origin" autocomplete="off" size="36" placeholder="Backend URL (blank = same origin)" aria-label="Backend URL"><button onclick="loadFleet()">Refresh</button><button onclick="location.href='/dashboard/login.html'">Sign in</button><span id="summary" class="muted"></span></div><div class="muted" style="margin-bottom:16px">Uses your sign-in session in this tab. Refresh to update health. No password or token entry is required here.</div><div id="cards" class="cards"></div></main>
+<script src="/dashboard/aicos-auth.js"></script>
+<script>
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function cls(s){return ['ok','baseline','unknown'].includes(String(s))?'ok':(['warning','uncalibrated'].includes(String(s))?'warn':'bad')}
+async function loadFleet(){
+ const summary=document.getElementById('summary');
+ if(!window.AicosAuth||!AicosAuth.token()){summary.textContent='Sign in in this tab to view cameras.';return}
+ const raw=document.getElementById('base').value.trim(); let base='';
+ if(raw){try{const u=new URL(raw);if(!['http:','https:'].includes(u.protocol)||u.username||u.password)throw Error();base=u.origin}catch(e){summary.textContent='Enter a complete http(s) backend URL, or leave it blank.';return}}
+ try{
+ const r=await fetch(base+'/api/cameras',{headers:AicosAuth.headers()}); if(!r.ok){summary.textContent=r.status===401?'Session expired. Sign in again in this tab.':'Camera request failed (HTTP '+r.status+').';return}
+ const d=await r.json(); document.getElementById('summary').textContent=`${d.online}/${d.count} online · ${d.integrity_attention} integrity attention`;
+ document.getElementById('cards').innerHTML=d.cameras.map(c=>{
+ const extra=c.extra||{}; const state=c.operational_status||(c.online?'online':'offline');
+ const stateClass=state==='online'?'ok':state==='offline'?'bad':'warn';
+ const score=['unknown','uncalibrated','error'].includes(c.integrity_status)?'Not assessed':Math.round(c.integrity_score||0)+'/100';
+ const detectorNames=Array.isArray(extra.detectors)?extra.detectors.map(x=>typeof x==='string'?x:x.name+' ('+x.status+')').join(', '):'';
+ return `<div class="card"><div class="row"><strong>${esc(c.source_id)}</strong><span class="pill ${stateClass}">${esc(state.replaceAll('_',' ').toUpperCase())}</span></div><div class="muted">${esc(c.name||'')} ${c.district?'· '+esc(c.district):''}</div><hr style="border-color:#203d44"><div class="row"><span>Mode</span><span>${esc(extra.mode||'not reported')}</span></div><div class="row"><span>Detector health</span><span class="${extra.detector_status==='failed'?'bad':''}">${esc(extra.detector_status||'not reported')}</span></div><div class="muted">${esc(detectorNames)}</div><div class="row"><span>Processing FPS (measured)</span><span>${Number(c.analysis_fps||0).toFixed(1)}</span></div><div class="row"><span>Source FPS (metadata hint)</span><span>${Number(c.capture_fps||0).toFixed(1)}</span></div><div class="row"><span>Frame age</span><span>${c.frame_age_seconds==null?'not reported':esc(c.frame_age_seconds)+'s'}</span></div><div class="row"><span>Skipped stale frames</span><span>${Number(c.dropped_frames||0)}</span></div><div class="row"><span>Reconnects</span><span>${Number(c.reconnects||0)}</span></div><div class="row"><span>Heartbeat age</span><span>${esc(c.heartbeat_age_seconds)}s</span></div><hr style="border-color:#203d44"><div class="row"><span>View integrity</span><span class="${cls(c.integrity_status)}">${esc(c.integrity_status)}</span></div><div class="score ${cls(c.integrity_status)}">${score}</div><div class="muted">${esc(c.integrity_reason||'')}</div><div class="row"><span>Worker</span><code>${esc(c.worker_version||'-')}</code></div>${c.certificate?`<div class="row"><span>Certificate</span><span class="ok">${esc(c.certificate.certificate_id||'signed')}</span></div>`:'<div class="row"><span>Certificate</span><span class="warn">not loaded</span></div>'}</div>`}).join('');
+ }catch(e){summary.textContent='Could not reach the backend. Check the connection and retry.'}
+}
+loadFleet();
+</script></body></html>

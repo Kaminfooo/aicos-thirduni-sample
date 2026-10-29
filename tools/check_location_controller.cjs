@@ -1,0 +1,17 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const els=new Map();const el=id=>{if(!els.has(id))els.set(id,{value:'',textContent:'',disabled:false,children:[],append(...x){this.children.push(...x)},replaceChildren(){this.children=[]},setAttribute(k,v){this[k]=v}});return els.get(id)};
+const context=vm.createContext({console,Number,Math,Error,document:{getElementById:el,createElement:()=>({append(){},setAttribute(){}})},navigator:{},active:false,writing:false,runSettings:null,runAlerts:[],selectedIncident:null,navigateSection(){}});
+vm.runInContext(fs.readFileSync('dashboard/map-assets/location-map.js','utf8'),context);
+const run=s=>vm.runInContext(s,context);el('camera-name').value='Gate A';
+assert.equal(run('readLocationForm().latitude'),null);
+el('camera-latitude').value='0';assert.throws(()=>run('readLocationForm()'),/both/);
+el('camera-longitude').value='0';assert.equal(run('readLocationForm().latitude'),0);assert.equal(run('validLocation(readLocationForm())'),true);
+el('camera-latitude').value='91';assert.throws(()=>run('readLocationForm()'),/Latitude/);
+el('camera-latitude').value='35';el('camera-longitude').value='NaN';assert.throws(()=>run('readLocationForm()'),/Longitude/);
+el('camera-longitude').value='3';el('save-camera-location').onclick();assert.equal(run('locationSettings().latitude'),35);
+run('let frozen=locationSettings()');el('camera-latitude').value='36';el('save-camera-location').onclick();assert.equal(run('frozen.latitude'),35);
+context.active=true;el('camera-latitude').value='37';el('save-camera-location').onclick();assert.equal(run('locationSettings().latitude'),36);
+context.active=false;el('clear-camera-location').onclick();assert.equal(run('locationSettings().latitude'),null);
+el('use-device-location').onclick();assert.match(el('map-message').textContent,/unavailable/);
+assert.equal(run('validLocation({latitude:null,longitude:null})'),false);
+console.log(JSON.stringify({passed:11,failed:0,scope:'Coordinate validation, frozen run settings, active-run locks, unknown location and no-geolocation fallback'}));

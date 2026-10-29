@@ -1,0 +1,17 @@
+# Local review configuration; importing a Blueprint creates an externally visible service.
+# Do not deploy until source/media publication and the destination have been approved.
+services:
+  - type: web
+    name: aicos-thirduni-replay
+    runtime: python
+    plan: free
+    region: frankfurt
+    autoDeployTrigger: "off"
+    buildCommand: "pip install --only-binary=:all: -r backend/requirements.lock.txt"
+    startCommand: "python -m uvicorn deploy.free_demo:app --host 0.0.0.0 --port $PORT --workers 1 --no-access-log"
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: PYTHONDONTWRITEBYTECODE
+        value: "1"

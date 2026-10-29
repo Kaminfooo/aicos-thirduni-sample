@@ -1,0 +1,21 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const nodes=new Map();function element(tag='div'){return {tag,value:'',children:[],options:[],readyState:4,videoWidth:480,currentTime:0,classList:{toggle(){}},append(...x){this.children.push(...x);if(this.tag==='select')this.options.push(...x)},replaceChildren(){this.children=[];this.options=[]},setAttribute(k,v){this[k]=v},removeAttribute(k){delete this[k]},addEventListener(){},pause(){},load(){},play:async()=>{},remove(){this.removed=true}}}const el=id=>{if(!nodes.has(id))nodes.set(id,element(id==='wall-device'?'select':'div'));return nodes.get(id)};
+el('wall-name').value='North entrance';el('wall-source-kind').value='reference';el('wall-reference').value='walking.mp4';
+let stopped=0,requested=0;const tracks=[{stop(){stopped++},addEventListener(){}}];
+const c=vm.createContext({console,URL,Number,Math,Error,Map,performance,location:{href:'https://aicos.test/',protocol:'https:'},document:{getElementById:el,createElement:element},navigator:{mediaDevices:{enumerateDevices:async()=>[],getUserMedia:async()=>{requested++;return {getTracks:()=>tracks,getVideoTracks:()=>tracks}}}},window:{addEventListener(){}},setTimeout:()=>1,setInterval:()=>1,clearTimeout(){},clearInterval(){},active:false,writing:false,capabilitiesReady:true,start(){}});
+const run=s=>vm.runInContext(s,c);
+(async()=>{run(fs.readFileSync('dashboard/map-assets/location-map.js','utf8').split('let locationMap=')[0]);run(fs.readFileSync('dashboard/map-assets/camera-wall.js','utf8'));await new Promise(setImmediate);let passed=0;
+ for(const url of ['','rtsp://camera/live','javascript:alert(1)','https://name:secret@camera/live','http://camera/live']){assert.throws(()=>run(`wallSourceURL(${JSON.stringify(url)})`));passed++}
+ assert.equal(run("wallSourceURL('https://camera.test/live.mp4')"),'https://camera.test/live.mp4');passed++;
+ assert.equal(run('readWallConfig().latitude'),null);el('wall-latitude').value='0';assert.throws(()=>run('readWallConfig()'),/both/);el('wall-longitude').value='0';assert.equal(run('readWallConfig().latitude'),0);passed++;
+ run('let reference=addWallFeed(readWallConfig())');assert.match(el('wall-count').textContent,/1 configured/);assert.equal(requested,0);passed++;
+ await run('connectWallFeed(reference)');assert.equal(run('reference.state'),'connected');assert.equal(run('reference.video.src'),'/judge/assets/walking.mp4');assert.match(el('wall-count').textContent,/0 connected/);assert.equal(el('wall-analyse').disabled,true);assert.throws(()=>run('wallAnalysisSource()'),/Reference/);passed++;
+ el('wall-reference').value='controlled-fall.mp4';run('stopWallFeed(reference)');await run('connectWallFeed(reference)');assert.equal(run('reference.video.src'),'/judge/assets/walking.mp4');passed++;
+ run('stopWallFeed(reference);reference.remove.onclick()');assert.equal(run('wallFeeds.size'),0);passed++;
+ el('wall-source-kind').value='device';run('let device=addWallFeed(readWallConfig())');await run('connectWallFeed(device)');assert.equal(requested,1);assert.equal(run('device.state'),'connected');assert.equal(el('wall-analyse').disabled,false);assert.equal(run('wallAnalysisSource().location.camera_name'),'North entrance');passed++;
+ c.active=true;run('syncCameraWall()');assert.equal(el('wall-analyse').disabled,true);assert.equal(run('device.remove.disabled'),true);c.active=false;passed++;
+ run('stopWallFeed(device)');assert.equal(stopped,1);assert.equal(run('device.stream'),null);assert.equal(run('device.video.srcObject'),null);passed++;
+ run('for(let n=1;n<9;n++)addWallFeed(readWallConfig())');assert.equal(run('wallFeeds.size'),9);assert.throws(()=>run('addWallFeed(readWallConfig())'),/nine/);passed++;
+ run('wallEl("wall-stop-all").onclick()');assert.equal(run('[...wallFeeds.values()].every(f=>f.state==="disconnected")'),true);passed++;
+ console.log(JSON.stringify({passed,failed:0,scope:'URL/coordinate validation, no automatic camera capture, reference labelling, per-source reconnect, device lifecycle, selected-feed analysis, active locks and preview slot limit'}));
+})().catch(e=>{console.error(e);process.exitCode=1});

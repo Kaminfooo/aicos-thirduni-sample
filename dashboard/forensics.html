@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AICOS Forensic Search</title>
+<style>
+:root{font-family:Inter,system-ui,Arial,sans-serif;color-scheme:dark}body{margin:0;background:#08111f;color:#e8eef8}.wrap{max-width:1200px;margin:auto;padding:24px}h1{margin:0 0 6px;font-size:28px}.sub{color:#94a3b8;margin-bottom:22px}.panel{background:#0f1b2d;border:1px solid #21324a;border-radius:14px;padding:16px;margin-bottom:16px}.grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px}.grid2{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}input,select,button{background:#0b1525;color:#eef4ff;border:1px solid #31445f;border-radius:8px;padding:10px;font-size:14px}button{cursor:pointer;background:#12365a}button:hover{background:#174a7b}.events{display:grid;gap:10px}.event{display:grid;grid-template-columns:115px 1fr 110px 110px;gap:12px;align-items:center;background:#0d1828;border:1px solid #21324a;border-radius:10px;padding:12px}.muted{color:#8da0b8;font-size:12px}.sev{font-weight:700}.pill{display:inline-block;padding:3px 8px;border-radius:999px;background:#1b2a40;font-size:12px}.empty{padding:28px;text-align:center;color:#8da0b8}.error{color:#fca5a5}.similar{margin-top:8px;padding-left:14px;border-left:3px solid #315a87}@media(max-width:800px){.grid,.grid2{grid-template-columns:1fr 1fr}.event{grid-template-columns:1fr}}@media(max-width:520px){.grid,.grid2{grid-template-columns:1fr}}</style>
+<link rel="stylesheet" href="/dashboard/aicos-light.css">
+</head>
+<body class="workspace">
+<nav class="workspace-nav" aria-label="Main navigation"><a class="brand" href="/dashboard/live-ops.html">AICOS</a><a href="/dashboard/live-ops.html">Incidents</a><a href="/dashboard/fleet.html">Camera health</a><a href="/dashboard/triage.html">Triage assistant</a><a href="/dashboard/forensics.html" aria-current="page">Evidence search</a><a class="nav-signin" href="/dashboard/login.html">Account / sign in</a></nav><div class="wrap">
+<h1>AICOS Forensic Search</h1><div class="sub">Privacy-first incident search. No facial recognition or biometric identity search.</div>
+<div class="panel">
+  <div class="grid">
+    <input id="token" type="password" placeholder="Session token (sign in first)">
+    <input id="q" placeholder="Keywords: fight, crowd, zone...">
+    <input id="source" placeholder="Camera ID">
+    <input id="district" placeholder="District">
+  </div><br>
+  <div class="grid2">
+    <select id="severity"><option value="1">Severity 1+</option><option value="2">Severity 2+</option><option value="3">Severity 3+</option><option value="4">Severity 4+</option><option value="5">Severity 5</option></select>
+    <select id="agent"><option value="">All agents</option><option>security</option><option>emergency</option><option>traffic</option><option>infrastructure</option><option>environmental</option></select>
+    <select id="status"><option value="">All statuses</option><option>detected</option><option>approved</option><option>dismissed</option><option>resolved</option></select>
+    <button id="search">Search incidents</button><button type="button" onclick="location.href='/dashboard/login.html'">Sign in</button>
+  </div>
+</div>
+<div class="panel">
+  <strong>Object / appearance metadata search</strong><div class="muted" style="margin:6px 0 12px">Non-biometric index: object kind, coarse color and motion direction. No face recognition.</div>
+  <div class="grid2">
+    <select id="okind"><option value="">Any object</option><option value="person">Person</option><option value="vehicle">Vehicle</option></select>
+    <select id="ocolor"><option value="">Any color</option><option>black</option><option>white</option><option>gray</option><option>red</option><option>orange</option><option>yellow</option><option>green</option><option>cyan</option><option>blue</option><option>purple</option><option>pink</option></select>
+    <select id="odirection"><option value="">Any direction</option><option>left</option><option>right</option><option>up</option><option>down</option><option>stationary</option></select>
+    <button id="osearch">Search object index</button>
+  </div>
+</div>
+<div id="meta" class="sub"></div><div id="events" class="events"></div>
+<div id="ometa" class="sub" style="margin-top:22px"></div><div id="objects" class="events"></div>
+</div>
+<script src="/dashboard/aicos-auth.js"></script>
+<script>
+const $=id=>document.getElementById(id); const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function authToken(){return ($('token').value.trim()||(window.AicosAuth&&AicosAuth.token())||'')} function headers(){const t=authToken();return t?{Authorization:'Bearer '+t}:{}}
+function dt(ts){return new Date(ts*1000).toLocaleString()}
+async function search(){
+  $('events').innerHTML='<div class="empty">Searching…</div>'; $('meta').textContent='';
+  const p=new URLSearchParams({q:$('q').value,source_id:$('source').value,district:$('district').value,min_severity:$('severity').value,agent:$('agent').value,status:$('status').value,limit:'100'});
+  try{const r=await fetch('/api/forensics/search?'+p,{headers:headers()}); if(!r.ok)throw new Error(await r.text()); const d=await r.json(); $('meta').textContent=`${d.events.length} incident(s) · full-text index ${d.fts?'enabled':'fallback'}`;
+  if(!d.events.length){$('events').innerHTML='<div class="empty">No matching incidents.</div>';return}
+  $('events').innerHTML=d.events.map(e=>`<div class="event"><div><div class="sev">SEV ${e.severity}</div><div class="muted">${esc(e.agent)}</div></div><div><strong>${esc(e.type)}</strong><div class="muted">${esc(e.source_id)} · ${esc(e.district||'—')} · ${dt(e.ts)}</div><div>${e.has_snapshot?`<button onclick="similar(${e.id},this)">Find similar scenes</button>`:''}</div><div class="similar" id="sim-${e.id}" hidden></div></div><div><span class="pill">${Math.round((e.confidence||0)*100)}%</span></div><div><span class="pill">${esc(e.status)}</span></div></div>`).join('');
+  }catch(e){$('events').innerHTML=`<div class="panel error">${esc(e.message)}</div>`}
+}
+async function similar(id,btn){const box=$('sim-'+id);box.hidden=false;box.textContent='Searching visual scene similarity…';try{const r=await fetch(`/api/forensics/similar/${id}?limit=8`,{headers:headers()});if(!r.ok)throw new Error(await r.text());const d=await r.json();box.innerHTML=d.matches.length?d.matches.map(m=>`#${m.event.id} ${esc(m.event.source_id)} · ${esc(m.event.type)} · ${(m.similarity*100).toFixed(1)}%<br>`).join(''):'No close scene matches.'}catch(e){box.textContent=e.message}}
+async function objectSearch(){
+ const p=new URLSearchParams({source_id:$('source').value,kind:$('okind').value,color:$('ocolor').value,direction:$('odirection').value,limit:'200'}); $('objects').innerHTML='<div class="empty">Searching object metadata…</div>';
+ try{const r=await fetch('/api/forensics/objects?'+p,{headers:headers()});if(!r.ok)throw new Error(await r.text());const d=await r.json();$('ometa').textContent=`${d.observations.length} observation(s)`;$('objects').innerHTML=d.observations.length?d.observations.map(o=>`<div class="event"><div><strong>${esc(o.kind)}</strong><div class="muted">${esc(o.color||'unknown')}</div></div><div>${esc(o.source_id)}<div class="muted">${dt(o.ts)}</div></div><div><span class="pill">${esc(o.direction||'—')}</span></div><div><span class="pill">${Math.round((o.confidence||0)*100)}%</span></div></div>`).join(''):'<div class="empty">No matching object observations.</div>'}catch(e){$('objects').innerHTML=`<div class="panel error">${esc(e.message)}</div>`}}
+if(window.AicosAuth&&AicosAuth.token())$('token').value=AicosAuth.token();$('search').addEventListener('click',search);$('osearch').addEventListener('click',objectSearch);$('q').addEventListener('keydown',e=>{if(e.key==='Enter')search()});
+</script></body></html>

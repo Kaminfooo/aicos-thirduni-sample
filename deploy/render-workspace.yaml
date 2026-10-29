@@ -1,0 +1,14 @@
+# Full isolated inference workspace. Free instances sleep and reset demo data.
+services:
+  - type: web
+    name: aicos-safety-operations
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./deploy/Dockerfile.workspace
+    dockerContext: .
+    autoDeployTrigger: "off"
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHONDONTWRITEBYTECODE
+        value: "1"

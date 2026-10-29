@@ -1,0 +1,64 @@
+{
+  "files": {
+    "context.gif": "02f9b0130818ae312fff8a2e456976dfb39c2a09753731749a4f395f3fe2f960",
+    "controlled-fall.mp4": "bfeda260c3ced0feea4e28e4c5e3cc47119523ed5419ac72ce98bc201ff1860b",
+    "LICENSE.txt": "f5b745ef98087f531e719ee8ca6a96809444573ecc7173c6fa68eaad39b3cc3f",
+    "trigger.jpg": "2481db352bd869fde32f7cc737067c112bdf0f97dda4fada46b57d649e1f3c8e",
+    "walking.mp4": "658646b6de7eca0921fc59fd381facccaa2707e76e2f35ad5bba4c2edb85860b"
+  },
+  "event": {
+    "agent": "emergency",
+    "type": "[REPLAY] Person down / possible medical emergency",
+    "severity": 4,
+    "confidence": 0.85,
+    "extra": {
+      "detector": "thirduni-pose-confirmed-person-down",
+      "human_review_required": true,
+      "down_seconds": 4.33,
+      "lead_seconds": 0,
+      "px": [
+        0.1571,
+        0.2592
+      ],
+      "transition_context": {
+        "track_id": 2,
+        "posture": "lying",
+        "transition": {
+          "kind": "already_down_transition_not_observed",
+          "reason": "no_stable_upright_reference"
+        },
+        "recovery_observed": false,
+        "medical_cause": "unknown",
+        "consciousness": "not_established",
+        "intent": "not_established"
+      },
+      "confirmation": {
+        "profile": "side-view-pose",
+        "method": "confident shoulders/hips/ankles; wide body and aligned torso/legs",
+        "observations": 8,
+        "persistence_seconds": 4.33
+      },
+      "is_replay": true,
+      "controlled_simulation": true,
+      "location_source": "synthetic demonstration point; not the recording location",
+      "source_credit": "ASSIST-IoT dataset: Anastasiya Danilenka, Piotr Sowiński, Monika Kobus, Anna Dąbrowska, Kajetan Rachwał, Karolina Bogacka, Krzysztof Baszczyński; CC BY 4.0; EU grant 957258; CIOP-PIB facilities. No endorsement implied.",
+      "source_page": "https://github.com/ASSIST-IoT-SRIPAS/multimodal-fall-detection-dataset",
+      "source_license": "https://creativecommons.org/licenses/by/4.0/",
+      "source_video_sha256": "bfeda260c3ced0feea4e28e4c5e3cc47119523ed5419ac72ce98bc201ff1860b",
+      "capture_seconds": 8.766666666666667,
+      "profile_sha256": "4799ae298d0a1839b14186cb2c6f1b2ca8c40d823bc1c9b97f8ad2c9d0ba3311",
+      "model_sha256": {
+        "yolo26n-pose.pt": "eb3bb8268828aeaf515cec23a4bfafd793944a86fe9af94ba7823609c14522a9"
+      },
+      "view_context": "Composed main/inset views of same simulated activity; not independent camera observations",
+      "live_inference": false
+    },
+    "source_id": "REPLAY-LICENSED-01",
+    "district": "DEMONSTRATION: synthetic map point",
+    "lat": 34.88803,
+    "lon": 3.490238
+  },
+  "derived_media": "JPEG extraction; resized captioned silent GIF, nominal 2FPS; original MP4s unchanged.",
+  "selected_after_development": true,
+  "publications_performed": false
+}

@@ -1,15 +1,14 @@
+# Full isolated inference workspace. Free instances sleep and reset demo data.
 services:
   - type: web
-    name: aicos-thirduni-sample
-    runtime: python
+    name: aicos-safety-operations
+    runtime: docker
     plan: free
     region: frankfurt
+    dockerfilePath: ./deploy/Dockerfile.workspace
+    dockerContext: .
     autoDeployTrigger: "off"
-    buildCommand: "pip install --only-binary=:all: -r requirements.txt"
-    startCommand: "python -m uvicorn app:create_app --factory --host 0.0.0.0 --port $PORT --workers 1 --no-access-log"
     healthCheckPath: /health
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.8
       - key: PYTHONDONTWRITEBYTECODE
         value: "1"

@@ -1,0 +1,31 @@
+{
+  "assets": [
+    {
+      "name": "violence-yolov8n.pt",
+      "url": "https://huggingface.co/Musawer14/fight_detection_yolov8/resolve/fcfd7db6a4d0fa34df763d3bbf21788200239e56/Yolo_nano_weights.pt?download=true",
+      "bytes": 6250147,
+      "sha256": "1714eef088cd4ae5fc8618f6f94890d476434298be6c7a2151faef18bef9d459",
+      "repository": "Musawer14/fight_detection_yolov8",
+      "revision": "fcfd7db6a4d0fa34df763d3bbf21788200239e56",
+      "publisher_license_metadata": "mit"
+    },
+    {
+      "name": "fire-smoke-yolo26n.pt",
+      "url": "https://huggingface.co/seawsurf/fire_yolo/resolve/9403f231bab33e0ea4048424ff64023936957ba5/weights/best.pt?download=true",
+      "bytes": 5377541,
+      "sha256": "d2b0be214f45fa01d2044b960c3cb4da4bf65c06a89cf0a1967b0d40e8db4b98",
+      "repository": "seawsurf/fire_yolo",
+      "revision": "9403f231bab33e0ea4048424ff64023936957ba5",
+      "publisher_license_metadata": "cc-by-4.0"
+    },
+    {
+      "name": "yolo26n.pt",
+      "url": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo26n.pt",
+      "bytes": 5544453,
+      "sha256": "9b09cc8bf347f0fc8a5f7657480587f25db09b34bf33b0652110fb03a8ad4fef",
+      "repository": "ultralytics/assets",
+      "revision": "v8.4.0"
+    }
+  ],
+  "validation": "staged; public-site performance not established"
+}
